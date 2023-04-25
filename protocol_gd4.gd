@@ -95,20 +95,20 @@ func readPackets():
 	#listen for sv messages
 	var data = PackedByteArray()
 	var n = 0
-	var dataA = PackedByteArray()
-	while n == len(dataA):
+	var last_len = 0
+	while n == last_len:
 		n = min(client.get_available_bytes(), 1024)
 		if n > 0:
 			var _readinfo = client.get_data(n)
 			if _readinfo[0] == OK:
-				dataA = _readinfo[1]
-				data.append_array(dataA)
+				last_len = n
+				data.append_array(_readinfo[1])
 			else:
+				print("read err " + str(_readinfo[0]) + " "+str(n) + " " + str(_readinfo[1]) + " "+str(client.get_status()))
 				n = 0
-			
 	var packets = packet_decoder.Decode(data)
 	if packets == null:
-		print("net read fail" + str(len(data)) +"   "+ str(len(dataA)) + " " + str(n))
+		print("net read fail" + str(len(data)) +"   "+ str(last_len) + " " + str(n))
 		return null
 	return packets
 
@@ -119,6 +119,7 @@ func connectServer():
 		print("net connect fail")
 		return
 	client.set_no_delay(true)
+	client.poll()
 	var p = packet_encoder.Encode(packet_Handshake, PackedByteArray())
 	if p == null:
 		print("net connect fail")
@@ -242,6 +243,7 @@ class Packet:
 	var Type = -1
 	var Length = -1
 	var Data = PackedByteArray()
+
 
 class PomeloPacketEncoder:
 #Encode create a packet.Packet from  the raw bytes slice and then encode to network bytes slice
