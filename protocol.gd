@@ -396,7 +396,7 @@ class MessagesEncoder:
 			#variant length encode
 			while true:
 				var b = (n % 128) & 0xFF
-				n >>= 7
+				n = n/128
 				if n != 0:
 					buf.append(b+128)
 				else:
@@ -446,7 +446,7 @@ class MessagesEncoder:
 			var i = offset
 			while i < len(data):
 				var b = data[i]
-				id += (b&0x7F) << (7*(i-offset))
+				id += (b&0x7F) * int(pow(2, (7 *i)))
 				if b < 128:
 					offset = i + 1
 					break
