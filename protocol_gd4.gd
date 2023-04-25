@@ -43,6 +43,7 @@ var heartbeatTimeout = -1
 var requestTimeout = 5
 
 var Connected = false
+var push_func = {}
 
 
 func _ready():
@@ -67,7 +68,7 @@ func SendRequest(route, data, cb):
 	m.ID = newMsgID()
 	m.Route = route
 	m.Data = data
-	m.SentAt = Time.get_unix_time_from_system()
+	m.SendAt = int(Time.get_unix_time_from_system())
 	m.Callback = cb
 	var p = buildPacket(m)
 	#c.pendingReqMutex.Lock()
@@ -76,13 +77,13 @@ func SendRequest(route, data, cb):
 	client.put_data(p)
 
 #SendNotify sends a notify to the server
-func SendNotify(route , data):
+func SendNotify(route, data):
 	var m = Message.new()
 	m.Type = message_Notify
 	m.ID = newMsgID()
 	m.Route = route
 	m.Data = data
-	m.SentAt = Time.get_unix_time_from_system()
+	m.SendAt = int(Time.get_unix_time_from_system())
 	var p = buildPacket(m)
 	client.put_data(p)
 
@@ -209,7 +210,7 @@ func requestReaper():
 		#c.pendingReqMutex.Lock()
 		for msgid in wait_cb.keys():
 			var msg = wait_cb[msgid]
-			if Time.get_unix_time_from_system() - msg.SendAt > requestTimeout:
+			if int(Time.get_unix_time_from_system()) - msg.SendAt > requestTimeout:
 				wait_cb.erase(msgid)
 				OnTimeoutMsg(msg)
 		#c.pendingReqMutex.Unlock()
@@ -221,16 +222,19 @@ func OnSrvPacket(m):
 		if m.ID in wait_cb:
 			var cb_msg = wait_cb[m.ID]
 			wait_cb.erase(m.ID)
-			cb_msg.Callback(true, cb_msg, m)
+			cb_msg.Callback.call(true, cb_msg, m)
 		#c.pendingReqMutex.Unlock()
 	else:
 		OnPushMsg(m)
 		
 func OnPushMsg(msg):
-	pass
+	print("OnPushMsg ... " + str(msg))
+	var cb_func = push_func.get(msg.Route)
+	if cb_func:
+		cb_func.call(msg)
 
 func OnTimeoutMsg(msg):
-	msg.Callback(false, msg, null)
+	msg.Callback.call(false, msg, null)
 
 	
 func _exit_tree():
@@ -381,9 +385,9 @@ class MessagesEncoder:
 		var flag = (message.Type & 0xFF) << 1
 
 		#routesCodesMutex.RLock()
-		var info = routes[message.Route]
-		var code = info[0]
-		var compressed = info[1]
+		var compressed = message.Route in routes
+		var code = routes.get(message.Route)
+
 		#routesCodesMutex.RUnlock()
 		if compressed:
 			flag |= message_msgRouteCompressMask
@@ -518,3 +522,4 @@ class Message:
 	var Err = false
 	var SendAt = 0
 	var Callback = null
+
